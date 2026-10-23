@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { AccountNav } from "../AccountNav";
+import { isPassportComplete } from "../profile/completion";
 import { DiscoverMap, type DiscoverProfile } from "./DiscoverMap";
 import { getBlockedUserIds } from "../safety/blocking";
 import { isSupabaseConfigured } from "../../utils/supabase/config";
@@ -61,7 +62,8 @@ function displayName(profile: ProfileRow) {
 }
 
 function profileId(profile: ProfileRow) {
-  return profile.user_id ?? profile.id ?? "";
+  // profiles.id is the Auth UUID; legacy user_id must not override ownership.
+  return profile.id ?? "";
 }
 
 function scrapbookHref(letter: LetterRow) {
@@ -94,7 +96,8 @@ export default async function BrowsePage({
 
   const { data: profiles, error: profilesError } = await supabase
     .from("profiles")
-    .select("*");
+    .select("*")
+    .neq("id", user.id);
 
   const { data: letters } = await supabase
     .from("letters")
@@ -139,10 +142,7 @@ export default async function BrowsePage({
     })
     .filter(
       (profile: ProfileRow) =>
-        Boolean(profile.country) &&
-        listFromProfileValue(profile.languages).length > 0 &&
-        listFromProfileValue(profile.interests).length > 0 &&
-        Boolean(profile.bio),
+        isPassportComplete(profile),
     )
     .map((profile: ProfileRow) => {
       const id = profileId(profile);
